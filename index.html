@@ -96,7 +96,8 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Lỗi mạng: ${response.statusText}`);
+                    // Throw an error with more specific information from the response if possible
+                    throw new Error(`Lỗi mạng: ${response.status} ${response.statusText}`);
                 }
 
                 const result = await response.json();
@@ -107,12 +108,20 @@
                     resultImage.src = imageUrl;
                     resultImage.classList.remove('hidden');
                 } else {
-                   throw new Error('Không nhận được hình ảnh hợp lệ từ API.');
+                   // Handle cases where the API call was 'ok' but returned no predictions or an error object
+                   const apiError = result.error ? result.error.message : 'Phản hồi không chứa hình ảnh hợp lệ.';
+                   throw new Error(apiError);
                 }
 
             } catch (error) {
                 console.error('Lỗi khi tạo hình ảnh:', error);
-                showError('Đã xảy ra lỗi khi tạo hình ảnh. Vui lòng thử lại.');
+                // **IMPROVED ERROR HANDLING**
+                // Provide a more user-friendly error message based on the error type.
+                let userErrorMessage = `Đã xảy ra lỗi: ${error.message}.`;
+                if (error.message.includes('Lỗi mạng') || error.message.includes('Failed to fetch')) {
+                    userErrorMessage = 'Lỗi kết nối hoặc xác thực API. Điều này thường xảy ra khi trang web được triển khai mà không có khóa API hợp lệ. Hãy kiểm tra lại cấu hình của bạn.';
+                }
+                showError(userErrorMessage);
                 placeholder.classList.remove('hidden'); // Show placeholder again on error
             } finally {
                 showLoading(false);
