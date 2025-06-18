@@ -81,47 +81,36 @@
             placeholder.classList.add('hidden');
 
             try {
-                // --- API Call ---
-                const payload = { 
-                    instances: { prompt: prompt }, 
-                    parameters: { "sampleCount": 1 } 
-                };
-                const apiKey = ""; // API key will be provided by the environment
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
-
-                const response = await fetch(apiUrl, {
+                // --- API Call to our Serverless Function ---
+                // We no longer call Google directly from the browser.
+                // Instead, we call our own function that lives at /.netlify/functions/generate-image
+                const response = await fetch('/.netlify/functions/generate-image', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    // We just send the prompt. The function will handle the API key.
+                    body: JSON.stringify({ prompt: prompt })
                 });
 
                 if (!response.ok) {
-                    // Throw an error with more specific information from the response if possible
-                    throw new Error(`Lỗi mạng: ${response.status} ${response.statusText}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Lỗi máy chủ: ${response.status}`);
                 }
 
                 const result = await response.json();
                 
                 // --- Process and display result ---
-                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
-                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                // The structure is now slightly different, we access the base64 string directly
+                if (result.imageBase64) {
+                    const imageUrl = `data:image/png;base64,${result.imageBase64}`;
                     resultImage.src = imageUrl;
                     resultImage.classList.remove('hidden');
                 } else {
-                   // Handle cases where the API call was 'ok' but returned no predictions or an error object
-                   const apiError = result.error ? result.error.message : 'Phản hồi không chứa hình ảnh hợp lệ.';
-                   throw new Error(apiError);
+                   throw new Error('Phản hồi không chứa dữ liệu hình ảnh hợp lệ.');
                 }
 
             } catch (error) {
                 console.error('Lỗi khi tạo hình ảnh:', error);
-                // **IMPROVED ERROR HANDLING**
-                // Provide a more user-friendly error message based on the error type.
-                let userErrorMessage = `Đã xảy ra lỗi: ${error.message}.`;
-                if (error.message.includes('Lỗi mạng') || error.message.includes('Failed to fetch')) {
-                    userErrorMessage = 'Lỗi kết nối hoặc xác thực API. Điều này thường xảy ra khi trang web được triển khai mà không có khóa API hợp lệ. Hãy kiểm tra lại cấu hình của bạn.';
-                }
-                showError(userErrorMessage);
+                showError(`Đã xảy ra lỗi: ${error.message}`);
                 placeholder.classList.remove('hidden'); // Show placeholder again on error
             } finally {
                 showLoading(false);
